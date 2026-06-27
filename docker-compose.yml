@@ -1,14 +1,21 @@
-services:
+version: '3.8'
 
+services:
   frontend:
-    build: .
+    build: ./client      
     ports:
       - "3000:80"
     networks:
       - ecommerce-net
+
+  backend:
+    build: ./backend     
+    ports:
+      - "5000:5000"
+    networks:
+      - ecommerce-net
     depends_on:
       - db
-
 
   db:
     image: mongo:latest
