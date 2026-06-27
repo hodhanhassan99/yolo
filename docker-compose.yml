@@ -1,0 +1,25 @@
+services:
+
+  frontend:
+    build: .
+    ports:
+      - "3000:80"
+    networks:
+      - ecommerce-net
+    depends_on:
+      - db
+
+
+  db:
+    image: mongo:latest
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - ecommerce-net
+
+networks:
+  ecommerce-net:
+    driver: bridge
+
+volumes:
+  mongo-data:
