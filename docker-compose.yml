@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   frontend:
     build: ./client      
@@ -16,6 +14,8 @@ services:
       - ecommerce-net
     depends_on:
       - db
+    environment:
+      - MONGODB_URI=mongodb://db:27017/yolomy
 
   db:
     image: mongo:latest
