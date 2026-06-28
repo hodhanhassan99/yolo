@@ -18,7 +18,7 @@ services:
       - MONGODB_URI=mongodb://db:27017/yolomy
 
   db:
-    image: mongo:latest
+    image: mongo:6
     volumes:
       - mongo-data:/data/db
     networks:

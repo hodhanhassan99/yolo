@@ -131,6 +131,20 @@ class ProductControl extends Component {
 
     // Method to handle adding a new product
     handleAddingNewProduct = (newProduct) =>{
+        axios.post('http://localhost:5000/api/products', newProduct)
+        .then(res => {
+
+            console.log(res.data);
+
+            this.setState({
+                actualProductList: [...this.state.actualProductList, res.data],
+                formVisibleOnPage: false
+            });
+
+        })
+        .catch(error => {
+            console.log(error);
+        });
         // if (newProduct.photo === undefined){
         //     newProduct.photo = Default_image
         // }
@@ -157,11 +171,7 @@ class ProductControl extends Component {
         //     console.log(pair[0]+ ', ' + pair[1]); 
         // }       
         // console.log(...formData)
-        axios.post('http://localhost:5000/api/products', newProduct)
-            .then(res => console.log(res.data))
-        this.setState({
-            formVisibleOnPage: false
-        })
+        
     };
     handleDeletingProduct = (id) =>{
         axios.delete('http://localhost:5000/api/products/'+id)
