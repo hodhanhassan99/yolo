@@ -22,6 +22,14 @@ Infrastructure Provisioning
 Terraform defines the EC2 instance networking and security group rules to ensure a reproducible environment
 Workflow Commands
 
+    Create a file named terraform.tfvars inside Stage_two/terraform:
+
+       aws_region     = "us-east-1"
+       aws_access_key = "<YOUR_AWS_ACCESS_KEY>"
+       aws_secret_key = "<YOUR_AWS_SECRET_KEY>"
+       key_name       = "<YOUR_EC2_KEYPAIR_NAME>"
+       ami_id         = "<UBUNTU_AMI_ID>"
+
     Initialization terraform init
 
     Validation terraform validate
