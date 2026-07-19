@@ -1,42 +1,26 @@
 Stage Two Deployment Reflection
+Overview
 
-For Stage Two the main goal was to get our YOLO e-commerce app up and running on AWS. Instead of doing everything by hand in the console, we used Infrastructure as Code (IaC) and some automation tools to make the process smoother. Specifically, I used Terraform to set up the actual cloud infrastructure and Ansible to handle the software installation and get the app deployed. Everything was running on an Ubuntu 22.04 EC2 instance.
-
+The primary goal for Stage Two was deploying the YOLO e-commerce application onto AWS using Infrastructure as Code and automation tools to streamline the process instead of manual console configuration I utilized Terraform for cloud infrastructure provisioning and Ansible for software installation and application deployment on an Ubuntu 22.04 EC2 instance
 Terraform
-Terraform was used to handle the heavy lifting for the infrastructure. I used it to define:
 
-    The Ubuntu EC2 instance.
-
-    A security group to manage traffic.
-
-    Firewall rules so that we could access SSH (22), the Frontend (3000), the Backend (5000), and the MongoDB (27017) ports.
-
-It was definitely easier than clicking through the AWS dashboard because I could just write out exactly what I needed. My workflow was basically running terraform init, then validating the code, checking the plan, and finally applying it to spin up the resources.
-
+Terraform managed infrastructure requirements by defining the Ubuntu EC2 instance alongside a security group for traffic management and firewall rules to permit access to SSH 22 Frontend 3000 Backend 5000 and MongoDB 27017 ports This approach proved superior to dashboard navigation by allowing precise declarations of required resources my workflow involved executing terraform init followed by code validation plan inspection and finally applying the configuration to provision resources
 Ansible
-Once Terraform had the server ready, I used Ansible to do all the boring configuration work. I wrote a playbook that took care of:
 
-    Installing Docker and the Python SDK.
-
-    Starting the Docker service and creating a network.
-
-    Pulling all the images and launching the MongoDB, backend, and frontend containers.
-
-This was really helpful because it meant I didn't have to manually SSH in and install everything piece by piece, and it makes the whole deployment repeatable if I need to do it again.
-
+Following infrastructure provisioning I used Ansible to automate server configuration through a playbook that installed Docker and the Python SDK started the Docker service created a network and pulled images to launch MongoDB backend and frontend containers This automation eliminated the need for manual SSH configuration and ensures the deployment process is repeatable
 Docker Deployment
-I broke the app down into three containers: the database (MongoDB), the backend API, and the frontend. Keeping them separate was a good move because it made it way easier to manage them individually and keeps everything consistent across different environments.
 
+The application architecture consists of three distinct containers for the database MongoDB the backend API and the frontend Decoupling these components improved management and ensured consistency across different environments
 Challenges Encountered
-I ran into a few headaches while getting this to work:
 
-    Key Pair: At first, the instance wouldn't launch because the key pair I referenced didn't exist in my AWS account. I had to create a new one and fix the Terraform file.
+   - Key Pair configuration errors prevented initial instance launches requiring the creation of a new key pair and subsequent Terraform file updates
 
-    Instance Type: I accidentally picked an instance type that wasn't covered by the Free Tier, so I had to switch it over to a t3.micro.
+   - Selecting an instance type outside the Free Tier necessitated a switch to a t3 micro
 
-    SSH Issues: I was getting tripped up by the default user—I was trying to log in as ec2-user (which is for Amazon Linux), but since I was using Ubuntu, I had to use the ubuntu username.
+   - Authentication errors occurred when attempting to use ec2-user instead of the correct ubuntu username for the Ubuntu instance
 
-    Frontend API calls: The biggest issue was that the frontend was still trying to talk to localhost:5000. I had to go back into the code, change the URL to point to the EC2 public IP, rebuild the image, and redeploy. I also had to clear my browser cache, which took me a minute to realize!
+  -  Frontend API connectivity issues persisted because the code referenced localhost 5000 which required updating the URL to the EC2 public IP rebuilding the image and clearing the browser cache
 
 Conclusion
-this was a great way to see how Terraform, Ansible, and Docker work together to automate things on AWS. Now the whole setup is automated from building the server to getting the containers running. It definitely shows how much easier DevOps practices make the whole deployment process compared to doing things manually.
+
+This project demonstrated the effective integration of Terraform Ansible and Docker to automate AWS deployments from server creation to container execution It highlights how DevOps practices significantly simplify deployment compared to manual methods
