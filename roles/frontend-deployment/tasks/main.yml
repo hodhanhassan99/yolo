@@ -1,0 +1,21 @@
+---
+- name: Pull frontend image from Docker Hub
+  docker_image:
+    name: "{{ frontend_image }}"
+    source: pull
+
+- name: Run frontend container
+  docker_container:
+    name: "{{ frontend_container_name }}"
+    image: "{{ frontend_image }}"
+    state: started
+    restart_policy: always
+
+    ports:
+      - "{{ frontend_port }}"
+
+    networks:
+      - name: "{{ frontend_network }}"
+
+  tags:
+    - frontend

@@ -1,0 +1,9 @@
+---
+- hosts: vagrant
+  become: true
+
+  roles:
+    - docker-setup
+    - setup-mongodb
+    - backend-deployment
+    - frontend-deployment
