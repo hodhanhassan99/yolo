@@ -1,5 +1,7 @@
 # YOLO E-Commerce Application
 
+
+
 This project demonstrates the deployment of a containerized full-stack e-commerce application. The application consists of a React frontend, a Node.js/Express backend, and a MongoDB database, with each component running inside its own Docker container.
 
 The project is divided into two stages:
@@ -82,6 +84,8 @@ The deployment consists of three containers:
 * Frontend Application
 
 The frontend communicates with the backend API, which stores product data inside MongoDB.
+
+![Dockerhub Images Screenshot](image.png)
 
 
 
