@@ -1,77 +1,52 @@
-# Stage Two AWS Deployment with Terraform and Ansible
+Stage Two AWS Deployment via Terraform and Ansible
+Summary
 
-## Project Overview
+This phase involves migrating the YOLO e-commerce application to Amazon Web Services utilizing full automation for infrastructure and deployment tasks Terraform handles provisioning while Ansible manages server setup and application orchestration
+Architecture
 
-This stage extends the YOLO e-commerce application by deploying it to Amazon Web Services (AWS). The deployment process is fully automated using Terraform for infrastructure provisioning and Ansible for server configuration and application deployment.
+The application runs on an Ubuntu 22 04 LTS EC2 instance and utilizes a three-container Docker architecture comprising a React frontend a Node js backend and a MongoDB database
+Technology Stack
 
-The application consists of:
+    Infrastructure AWS EC2 and Terraform
 
-- Frontend (React)
-- Backend (Node.js/Express)
-- MongoDB Database
+    Automation Ansible
 
-All services are deployed as Docker containers on an AWS EC2 Ubuntu instance.
+    Containerization Docker
 
-## Technologies Used
+    Application React and Node js
 
--AWS EC2
-- Terraform
-- Ansible
-- Docker
--MongoDB
-- React
-- Node.js
-- Ubuntu 22.04 LTS
+    Database MongoDB 6
 
-## Infrastructure Provisioning
+Infrastructure Provisioning
 
-Terraform is used to create:
+Terraform defines the EC2 instance networking and security group rules to ensure a reproducible environment
+Workflow Commands
 
--EC2 Instance
--Security Group
--Networking configuration
+    Initialization terraform init
 
-Terraform commands:
+    Validation terraform validate
 
-terraform init
-terraform validate
-terraform plan
-terraform apply
+    Planning terraform plan
 
+    Deployment terraform apply
 
-To destroy the infrastructure use:
+    Teardown terraform destroy
 
-terraform destroy
+Configuration Management
 
-
-## Configuration Management
-
-Ansible automates the configuration of the EC2 instance.
-
-Tasks performed include these:
-
--Installing Docker
--Installing Docker Python SDK
--Creating Docker network
--Deploying MongoDB container
--Deploying Backend container
--Deploying Frontend container
-
-Run the deployment using this:
+Ansible streamlines the server setup by executing a playbook that installs Docker and the necessary Python SDKs creates a dedicated network and deploys the containerized services
+Execution Command
 
 ansible-playbook -i hosts playbook.yml
+Application Components
 
+    Database MongoDB 6
 
-## Docker Images
+    Backend hodhan/yolo-backend:v1.0.0
 
-The project uses the following Docker images:
+    Frontend hodhan/yolo-frontend:v1.0.1
 
-MongoDB 6
-hodhan/yolo-backend:v1.0.0
-hodhan/yolo-frontend:v1.0.1
-
-
-## Project Structure
+Project Directory
 
 Stage_two/
 ├hosts
@@ -81,16 +56,6 @@ Stage_two/
 ├README.md
 └explanation.md
 
+Deployment Results
 
-## Deployment Outcome
-
-After deployment:
-
-EC2 instance is created automatically.
-Docker is installed automatically.
-MongoDB runs inside a container.
-Backend runs inside a container.
-Frontend runs inside a container.
-Users can access the application through the EC2 public IP.
-
-The deployment demonstrates Infrastructure as Code and automated application deployment using Terraform and Ansible.
+The automated pipeline successfully provisions the EC2 infrastructure and configures the environment to host the three-tier application stack Upon completion the application becomes accessible via the EC2 public IP showcasing the efficiency of combining Infrastructure as Code with automated configuration management
