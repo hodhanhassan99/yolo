@@ -78,7 +78,7 @@ class ProductControl extends Component {
     }
     
     componentDidMount(){
-        axios.get('http://localhost:5000/api/products')
+        axios.get('http://3.90.2.37:5000/api/products')
             .then(res =>{
                 console.log(res)
                 this.setState({
@@ -131,7 +131,7 @@ class ProductControl extends Component {
 
     // Method to handle adding a new product
     handleAddingNewProduct = (newProduct) =>{
-        axios.post('http://localhost:5000/api/products', newProduct)
+        axios.post('http://3.90.2.37:5000/api/products', newProduct)
         .then(res => {
 
             console.log(res.data);
@@ -174,7 +174,7 @@ class ProductControl extends Component {
         
     };
     handleDeletingProduct = (id) =>{
-        axios.delete('http://localhost:5000/api/products/'+id)
+        axios.delete('http://3.90.2.37:5000/api/products/'+id)
             .then(res => console.log(res.data))
             .catch((error) =>{
                 console.log(error)
@@ -194,7 +194,7 @@ class ProductControl extends Component {
     }
     handleEditingProduct = (editedProduct) =>{
 
-        axios.put('http://localhost:5000/api/products/' + this.state.selectedProduct._id, editedProduct)
+        axios.put('http://3.90.2.37:5000/api/products/' + this.state.selectedProduct._id, editedProduct)
             .then(res =>console.log(res.data))
         
         this.setState({
