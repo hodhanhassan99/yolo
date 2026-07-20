@@ -1,0 +1,20 @@
+---
+- name: Create MongoDB container
+  docker_container:
+    name: "{{ mongo_container_name }}"
+    image: "{{ mongo_image }}"
+    state: started
+    restart_policy: always
+
+    ports:
+      - "{{ mongo_port }}"
+
+    volumes:
+      - "{{ mongo_volume }}:/data/db"
+
+    networks:
+      - name: "{{ mongo_network }}"
+
+  tags:
+    - mongodb
+    - database

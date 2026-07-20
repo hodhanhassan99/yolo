@@ -1,0 +1,27 @@
+---
+- name: Update apt package cache
+  apt:
+    update_cache: yes
+
+- name: Install Docker
+  apt:
+    name: "{{ docker_package }}"
+    state: present
+
+- name: Install Python Docker SDK
+  apt:
+    name: "{{ python_docker_package }}"
+    state: present
+
+- name: Start Docker service
+  service:
+    name: docker
+    state: started
+    enabled: yes
+
+- name: Create Docker network
+  docker_network:
+    name: "{{ docker_network }}"
+
+  tags:
+    - docker

@@ -1,0 +1,6 @@
+---
+backend_container_name: yolo-backend
+backend_image: hodhan/yolo-backend:v1.0.0
+backend_network: ecommerce-net
+backend_port: "5000:5000"
+mongodb_uri: mongodb://app-mongo:27017/yolomy

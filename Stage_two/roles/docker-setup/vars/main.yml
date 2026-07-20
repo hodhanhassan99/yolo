@@ -1,0 +1,4 @@
+---
+docker_package: docker.io
+python_docker_package: python3-docker
+docker_network: ecommerce-net

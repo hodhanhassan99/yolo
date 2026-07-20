@@ -1,0 +1,10 @@
+---
+- name: Deploy YOLO Application on AWS EC2
+  hosts: aws
+  become: true
+
+  roles:
+    - docker-setup
+    - setup-mongodb
+    - backend-deployment
+    - frontend-deployment
