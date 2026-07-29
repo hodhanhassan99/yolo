@@ -68,8 +68,13 @@ Vagrant.configure("2") do |config|
   #   apt-get install -y apache2
   # SHELL
   # Provisioning configuration for Ansible.
+config.vm.box = "bento/ubuntu-22.04"
+
+config.vm.network "forwarded_port", guest: 3000, host: 3000
+
 config.vm.provision "ansible" do |ansible|
   ansible.playbook = "playbook.yml"
-config.vm.network "forwarded_port", guest: 3000, host: 3000  
-  end
+  ansible.inventory_path = "hosts"
+end
+
 end

@@ -1,4 +1,6 @@
 ---
-mongo_container_name: app_mongo
-mongo_network: app-network
-mongo_volume: app-mongo-data
+mongo_container_name: app-mongo
+mongo_image: mongo:6
+mongo_network: ecommerce-net
+mongo_volume: mongo-data
+mongo_port: "27017:27017"

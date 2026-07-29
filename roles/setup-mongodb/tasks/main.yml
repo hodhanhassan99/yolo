@@ -1,14 +1,20 @@
 ---
-- name: Run MongoDB Container
+- name: Create MongoDB container
   docker_container:
-    name: app-mongo
-    image: mongo
+    name: "{{ mongo_container_name }}"
+    image: "{{ mongo_image }}"
+    state: started
+    restart_policy: always
+
     ports:
-      - '27017:27017'
+      - "{{ mongo_port }}"
+
     volumes:
-      - ./app-mongo-data:/data/db
+      - "{{ mongo_volume }}:/data/db"
+
     networks:
-      - name: app-net
+      - name: "{{ mongo_network }}"
+
   tags:
+    - mongodb
     - database
-    - backend

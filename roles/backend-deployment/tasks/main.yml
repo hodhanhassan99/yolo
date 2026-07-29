@@ -1,16 +1,24 @@
 ---
-- name: Pull image from repository
+- name: Pull backend image from Docker Hub
   docker_image:
-    name: brianbwire/brian-yolo-backend:v1.0.0
+    name: "{{ backend_image }}"
     source: pull
 
-- name: Create Node.js Backend Container
+- name: Run backend container
   docker_container:
-    name: brian-yolo-backend
-    image: brianbwire/brian-yolo-backend:v1.0.0
-    networks:
-      - name: app-net
+    name: "{{ backend_container_name }}"
+    image: "{{ backend_image }}"
+    state: started
+    restart_policy: always
+
     ports:
-      - "5000:5000"
-    command: "npm start"
-  become: yes
+      - "{{ backend_port }}"
+
+    env:
+      MONGODB_URI: "{{ mongodb_uri }}"
+
+    networks:
+      - name: "{{ backend_network }}"
+
+  tags:
+    - backend
