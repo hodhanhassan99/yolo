@@ -1,19 +1,22 @@
 ---
-- name: Create MongoDB container
-  docker_container:
-    name: "{{ mongo_container_name }}"
-    image: "{{ mongo_image }}"
-    state: started
-    restart_policy: always
+- name: MongoDB deployment
+  block:
 
-    ports:
-      - "{{ mongo_port }}"
+    - name: Create MongoDB container
+      docker_container:
+        name: "{{ mongo_container_name }}"
+        image: "{{ mongo_image }}"
+        state: started
+        restart_policy: always
 
-    volumes:
-      - "{{ mongo_volume }}:/data/db"
+        ports:
+          - "{{ mongo_port }}"
 
-    networks:
-      - name: "{{ mongo_network }}"
+        volumes:
+          - "{{ mongo_volume }}:/data/db"
+
+        networks:
+          - name: "{{ mongo_network }}"
 
   tags:
     - mongodb

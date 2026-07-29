@@ -1,21 +1,25 @@
 ---
-- name: Pull frontend image from Docker Hub
-  docker_image:
-    name: "{{ frontend_image }}"
-    source: pull
+- name: Frontend deployment
+  block:
 
-- name: Run frontend container
-  docker_container:
-    name: "{{ frontend_container_name }}"
-    image: "{{ frontend_image }}"
-    state: started
-    restart_policy: always
+    - name: Pull frontend image from Docker Hub
+      docker_image:
+        name: "{{ frontend_image }}"
+        source: pull
 
-    ports:
-      - "{{ frontend_port }}"
+    - name: Run frontend container
+      docker_container:
+        name: "{{ frontend_container_name }}"
+        image: "{{ frontend_image }}"
+        state: started
+        restart_policy: always
 
-    networks:
-      - name: "{{ frontend_network }}"
+        ports:
+          - "{{ frontend_port }}"
+
+        networks:
+          - name: "{{ frontend_network }}"
 
   tags:
     - frontend
+    - deployment

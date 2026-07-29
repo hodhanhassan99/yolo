@@ -1,27 +1,30 @@
 ---
-- name: Update apt package cache
-  apt:
-    update_cache: yes
+- name: Docker installation and configuration
+  block:
 
-- name: Install Docker
-  apt:
-    name: "{{ docker_package }}"
-    state: present
+    - name: Update apt package cache
+      apt:
+        update_cache: yes
 
-- name: Install Python Docker SDK
-  apt:
-    name: "{{ python_docker_package }}"
-    state: present
+    - name: Install Docker
+      apt:
+        name: "{{ docker_package }}"
+        state: present
 
-- name: Start Docker service
-  service:
-    name: docker
-    state: started
-    enabled: yes
+    - name: Install Python Docker SDK
+      apt:
+        name: "{{ python_docker_package }}"
+        state: present
 
-- name: Create Docker network
-  docker_network:
-    name: "{{ docker_network }}"
+    - name: Start Docker service
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Create Docker network
+      docker_network:
+        name: "{{ docker_network }}"
 
   tags:
     - docker

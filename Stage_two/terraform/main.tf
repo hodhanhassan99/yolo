@@ -6,6 +6,10 @@ terraform {
       source  = "hashicorp/aws"
       version = ">= 5.0"
     }
+
+    null = {
+      source = "hashicorp/null"
+    }
   }
 }
 
@@ -57,10 +61,9 @@ resource "aws_security_group" "yolo_sg" {
 
 resource "aws_instance" "yolo_server" {
 
-  ami = var.ami_id
+  ami           = var.ami_id
   instance_type = var.instance_type
-
-  key_name = var.key_name
+  key_name      = var.key_name
 
   vpc_security_group_ids = [
     aws_security_group.yolo_sg.id
@@ -68,5 +71,16 @@ resource "aws_instance" "yolo_server" {
 
   tags = {
     Name = "YOLO-Server"
+  }
+}
+
+resource "null_resource" "ansible_provision" {
+
+  depends_on = [
+    aws_instance.yolo_server
+  ]
+
+  provisioner "local-exec" {
+    command = "ansible-playbook -i ../hosts ../playbook.yml"
   }
 }

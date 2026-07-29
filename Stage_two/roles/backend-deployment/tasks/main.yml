@@ -1,24 +1,28 @@
 ---
-- name: Pull backend image from Docker Hub
-  docker_image:
-    name: "{{ backend_image }}"
-    source: pull
+- name: Backend deployment
+  block:
 
-- name: Run backend container
-  docker_container:
-    name: "{{ backend_container_name }}"
-    image: "{{ backend_image }}"
-    state: started
-    restart_policy: always
+    - name: Pull backend image from Docker Hub
+      docker_image:
+        name: "{{ backend_image }}"
+        source: pull
 
-    ports:
-      - "{{ backend_port }}"
+    - name: Run backend container
+      docker_container:
+        name: "{{ backend_container_name }}"
+        image: "{{ backend_image }}"
+        state: started
+        restart_policy: always
 
-    env:
-      MONGODB_URI: "{{ mongodb_uri }}"
+        ports:
+          - "{{ backend_port }}"
 
-    networks:
-      - name: "{{ backend_network }}"
+        env:
+          MONGODB_URI: "{{ mongodb_uri }}"
+
+        networks:
+          - name: "{{ backend_network }}"
 
   tags:
     - backend
+    - deployment
