@@ -10,12 +10,15 @@ terraform {
     null = {
       source = "hashicorp/null"
     }
+
+    local = {
+      source = "hashicorp/local"
+    }
   }
 }
 
 provider "aws" {
-  region     = var.aws_region
-  
+  region = var.aws_region
 }
 
 resource "aws_security_group" "yolo_sg" {
@@ -59,24 +62,35 @@ resource "aws_security_group" "yolo_sg" {
 }
 
 resource "aws_instance" "yolo_server" {
-
-  ami           = var.ami_id
-  instance_type = var.instance_type
-  key_name      = var.key_name
-
-  vpc_security_group_ids = [
-    aws_security_group.yolo_sg.id
-  ]
+  ami                    = var.ami_id
+  instance_type          = var.instance_type
+  key_name               = var.key_name
+  vpc_security_group_ids = [aws_security_group.yolo_sg.id]
 
   tags = {
     Name = "YOLO-Server"
   }
 }
 
+resource "local_file" "ansible_inventory" {
+  filename = "${path.module}/../hosts"
+
+  content = <<EOF
+[aws]
+${aws_instance.yolo_server.public_ip}
+
+[aws:vars]
+ansible_user=ubuntu
+ansible_ssh_private_key_file=/home/hodhanhassan/.ssh/new-yolo-key.pem
+ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+EOF
+}
+
 resource "null_resource" "ansible_provision" {
 
   depends_on = [
-    aws_instance.yolo_server
+    aws_instance.yolo_server,
+    local_file.ansible_inventory
   ]
 
   provisioner "local-exec" {

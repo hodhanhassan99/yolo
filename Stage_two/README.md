@@ -52,7 +52,7 @@ Application Components
 
     Backend hodhan/yolo-backend:v1.0.0
 
-    Frontend hodhan/yolo-frontend:v1.0.1
+    Frontend hodhan/yolo-frontend:v1.0.5
 
 Project Directory
 
