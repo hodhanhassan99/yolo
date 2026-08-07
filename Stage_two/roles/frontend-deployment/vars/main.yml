@@ -1,5 +1,10 @@
 ---
 frontend_container_name: yolo-frontend
-frontend_image: hodhan/yolo-frontend:v1.0.5
+
+frontend_image: yolo-frontend
+
 frontend_network: ecommerce-net
+
 frontend_port: "3000:80"
+
+repo_dest: /opt/yolo

@@ -2,10 +2,12 @@
 - name: Frontend deployment
   block:
 
-    - name: Pull frontend image from Docker Hub
+    - name: Build frontend Docker image
       docker_image:
         name: "{{ frontend_image }}"
-        source: pull
+        source: build
+        build:
+          path: "{{ repo_dest }}/client"
 
     - name: Run frontend container
       docker_container:

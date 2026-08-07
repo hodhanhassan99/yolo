@@ -26,6 +26,7 @@ resource "aws_security_group" "yolo_sg" {
   description = "Allow SSH, HTTP and application ports"
 
   ingress {
+    description = "SSH"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
@@ -33,6 +34,7 @@ resource "aws_security_group" "yolo_sg" {
   }
 
   ingress {
+    description = "Frontend"
     from_port   = 3000
     to_port     = 3000
     protocol    = "tcp"
@@ -40,6 +42,7 @@ resource "aws_security_group" "yolo_sg" {
   }
 
   ingress {
+    description = "Backend API"
     from_port   = 5000
     to_port     = 5000
     protocol    = "tcp"
@@ -47,6 +50,7 @@ resource "aws_security_group" "yolo_sg" {
   }
 
   ingress {
+    description = "MongoDB"
     from_port   = 27017
     to_port     = 27017
     protocol    = "tcp"
@@ -58,6 +62,10 @@ resource "aws_security_group" "yolo_sg" {
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "yolo-security-group"
   }
 }
 
@@ -94,6 +102,7 @@ resource "null_resource" "ansible_provision" {
   ]
 
   provisioner "local-exec" {
-    command = "ansible-playbook -i ../hosts ../playbook.yml"
+    working_dir = "${path.module}/.."
+    command     = "ansible-playbook -i hosts playbook.yml"
   }
 }

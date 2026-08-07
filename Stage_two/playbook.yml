@@ -4,6 +4,7 @@
   become: true
 
   roles:
+    - clone-repository
     - docker-setup
     - setup-mongodb
     - backend-deployment

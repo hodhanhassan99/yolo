@@ -1,0 +1,13 @@
+---
+- name: Install Git
+  apt:
+    name: git
+    state: present
+    update_cache: yes
+
+- name: Clone YOLO repository
+  git:
+    repo: "{{ repo_url }}"
+    dest: "{{ repo_dest }}"
+    version: "{{ repo_version }}"
+    force: yes

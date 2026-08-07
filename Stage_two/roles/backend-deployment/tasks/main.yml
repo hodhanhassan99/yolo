@@ -2,10 +2,12 @@
 - name: Backend deployment
   block:
 
-    - name: Pull backend image from Docker Hub
+    - name: Build backend Docker image
       docker_image:
         name: "{{ backend_image }}"
-        source: pull
+        source: build
+        build:
+          path: "{{ repo_dest }}/backend"
 
     - name: Run backend container
       docker_container:
