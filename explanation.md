@@ -1,199 +1,625 @@
-#  CAT 2 Project Explanation
+# Stage 1 — Ansible Deployment Explanation
 
-## 
-The objective of this project was to containerize an existing e-commerce application using Docker. The application consists of three separate components:
+## 1. Introduction
 
-1.A React frontend that users interact with.
-2.A Node.js/Express backend that processes requests.
-3.A MongoDB database that stores product information.
+Stage 1 of the YOLO e-commerce project uses **Vagrant, Ansible, and Docker** to automatically provision and deploy the application inside an Ubuntu virtual machine.
 
+The purpose of using Ansible is to replace manual server configuration and container deployment with a repeatable automation process.
 
-Instead of installing each of these applications directly on my laptop Docker was used to package each one into its own container and Docker Compose was then used to make all three containers communicate with each other automatically.
+The Ansible playbook executes several roles sequentially. Each role has a specific responsibility, and the order is important because later roles depend on resources configured by earlier roles.
 
-# the Project Structure
+The execution sequence is:
 
-The project was already provided with three main components:
+```text
+clone-repository
+        ↓
+docker-setup
+        ↓
+setup-mongodb
+        ↓
+backend-deployment
+        ↓
+frontend-deployment
+```
 
-1. **client/** – React frontend
-2. **backend/** – Node.js Express API
-  3.**MongoDB** – Database
+---
 
+# 2. Playbook Structure
 
-The goal was to create Docker containers that could run all three services together as one application
+The Stage 1 root playbook is `playbook.yml`.
 
-# Creating the Dockerfiles
+It contains the following roles:
 
-I created separate Dockerfiles  for the frontend (client) and backend.
+```yaml
+---
+- hosts: all
+  become: true
 
-## Frontend Dockerfile
+  roles:
+    - clone-repository
+    - docker-setup
+    - setup-mongodb
+    - backend-deployment
+    - frontend-deployment
+```
 
-The frontend uses a multistage build.
+The `become: true` option allows Ansible to execute tasks with elevated privileges where required, such as installing packages and managing the Docker service.
 
-During the first stage a Node.js image is used to install dependencies and build the React application.
+Ansible executes roles in the order in which they appear in the playbook. Therefore, the order above is intentional.
 
-A lightweight Alpine Linux image was selected because it contains only the packages required to build the application, making the final image much smaller.
+---
 
-After the React application was built a second stage copies only the finished production files into an nginx container.
+# 3. Role 1 — clone-repository
 
-Nginx is used because React production builds consist only of static HTML CSS and JavaScript files Nginx is lightweight fast and designed for serving static websites.
+## Purpose
 
-This approach keeps the final frontend image much smaller than keeping Node.js inside the production container.
+The `clone-repository` role prepares the application source code inside the virtual machine.
 
-## Backend Dockerfile
+The assignment requires the deployment process to obtain the application source code automatically rather than requiring the user to manually copy the project into the VM.
 
-The backend Dockerfile uses the official Node.js Alpine image.
+The role therefore:
 
+1. Installs Git.
+2. Clones the YOLO GitHub repository.
+3. Places the repository inside `/opt/yolo`.
 
-(FROM node:18-alpine)
+The source directory becomes:
 
+```text
+/opt/yolo
+```
 
-The backend requires Node.js to execute the Express server.
+This directory contains the application source code required by the backend and frontend Docker builds.
 
-The Dockerfile copies the application files  installs dependencies using npm and starts the server.
+## Ansible Modules Used
 
+### `apt`
 
-# Creating docker-compose.yml
+The `apt` module installs Git:
 
-Docker Compose was used to manage all application containers together.
+```yaml
+- name: Install Git
+  apt:
+    name: git
+    state: present
+    update_cache: yes
+```
 
-Three services were defined:
+The module ensures that Git is available before attempting to clone the repository.
 
- -frontend
+### `git`
 
--backend
+The `git` module retrieves the application source code:
 
- -db
+```yaml
+- name: Clone YOLO repository
+  git:
+    repo: "{{ repo_url }}"
+    dest: "{{ repo_dest }}"
+    version: "{{ repo_version }}"
+    force: yes
+```
 
-Instead of starting each container manually, Docker Compose starts everything using a single command.
+The repository URL, destination, and branch/version are controlled through variables.
 
+## Why This Role Runs First
 
-(docker compose up)
+This role runs first because the frontend and backend images are built from source code.
 
-# Docker Networking
+The source code must therefore exist before the deployment roles attempt to build the Docker images.
 
-A custom bridge network called **ecommerce-net** was created.
-This allows all containers to communicate securely with one another.
+---
 
-Instead of connecting to MongoDB using localhost, the backend connects using the database service name.
+# 4. Role 2 — docker-setup
 
+## Purpose
 
-(mongodb://db:27017/yolomy)
+The `docker-setup` role prepares the VM to run the application's containers.
 
+The role:
 
-Docker automatically resolves **db** to the MongoDB container.
+* Updates the package cache.
+* Installs Docker.
+* Installs the Python Docker SDK required by Ansible's Docker modules.
+* Starts and enables the Docker service.
+* Creates the application Docker network.
 
-#  Port Allocation
+## Ansible Modules Used
 
-Each service exposes only the ports needed by the user.
+### `apt`
 
-Frontend-  3000 -> 80
+The `apt` module is used to install Docker and the Python Docker SDK.
 
+Example:
 
-Backend- 5000 -> 5000
+```yaml
+- name: Install Docker
+  apt:
+    name: "{{ docker_package }}"
+    state: present
+```
 
+The Python Docker SDK is also installed because Ansible's `docker_container` and `docker_image` modules communicate with Docker through the Docker API.
 
-MongoDB communicates only inside the Docker network and therefore does not need to expose a port to the host machine.
+### `service`
 
+The `service` module starts Docker and enables it to start automatically:
 
-# Step 6: Database Persistence
+```yaml
+- name: Start Docker service
+  service:
+    name: docker
+    state: started
+    enabled: yes
+```
 
-One important requirement of the assignment was ensuring that products remain saved even after containers are stopped.
+### `docker_network`
 
-A named Docker volume was created.
+The `docker_network` module creates the shared application network:
 
+```yaml
+- name: Create Docker network
+  docker_network:
+    name: "{{ docker_network }}"
+```
+
+The network used by the application is:
+
+```text
+ecommerce-net
+```
+
+## Why This Role Runs Second
+
+Docker must be installed and running before Ansible can create or manage Docker containers.
+
+The Docker network must also exist before the MongoDB, backend, and frontend containers are started.
+
+Therefore, this role must execute before the container deployment roles.
+
+---
+
+# 5. Role 3 — setup-mongodb
+
+## Purpose
+
+The `setup-mongodb` role creates the MongoDB database container.
+
+MongoDB acts as the persistent data store for the e-commerce application.
+
+The container is configured with:
+
+* A MongoDB Docker image.
+* The `ecommerce-net` network.
+* Port `27017`.
+* A persistent Docker volume.
+
+The MongoDB data directory inside the container is:
+
+```text
+/data/db
+```
+
+The named Docker volume is:
+
+```text
+mongo-data
+```
+
+## Ansible Module Used
+
+### `docker_container`
+
+The `docker_container` module creates and starts the MongoDB container.
+
+The role also configures the container's port, volume, network, restart policy, and image.
+
+The important persistence configuration is:
+
+```yaml
 volumes:
-  mongo-data:
+  - "{{ mongo_volume }}:/data/db"
+```
 
+This means MongoDB data is stored in a Docker volume instead of only inside the container's writable layer.
 
-The MongoDB container stores its data inside this volume.
+## Why This Role Runs Before the Backend
 
-This means that even after running  docker compose down and later  docker compose up
-all previously added products remain in the database.
+The backend application needs MongoDB to store and retrieve product information.
 
-This confirmed that persistence was successfully implemented.
+The backend is configured with a MongoDB connection string pointing to the MongoDB container:
 
-# Problems I Encountered
+```text
+mongodb://app-mongo:27017/yolomy
+```
 
-Several problems were encountered while completing this project.
+Therefore, MongoDB is deployed before the backend container.
 
-##  React Build Failure
+---
 
-Initially the frontend image failed to build.
+# 6. Role 4 — backend-deployment
 
-This error appeared: (ERR_OSSL_EVP_UNSUPPORTED)
+## Purpose
 
+The `backend-deployment` role builds and starts the Node.js/Express backend.
 
-This happened because the project uses an older version of React Scripts together with a newer version of Node.js.The solution was to update the Dockerfile to use Node.js 18 instead of Node.js 20 which is compatible with the project's version of React Scripts.
+Unlike the previous implementation, the application is now built from the source code cloned by the `clone-repository` role.
 
-## Containers Exiting
+The backend source code is located at:
 
-At one point all containers stopped running after the application was closed.
+```text
+/opt/yolo/backend
+```
 
-Running (docker ps -a) showed that the containers had exited. I restarted the application using (docker compose up) successfully and recreated the running containers.
-## Products Did Not Appear Immediately
+## Ansible Modules Used
 
-After adding a product through the form it was successfully saved in MongoDB but it did not immediately appear on the products page.
+### `docker_image`
 
-Initially the page had to be refreshed manually before the product became visible.
+The `docker_image` module builds the backend Docker image from the application source:
 
-The issue was caused because the React state was not updated after the POST request completed.
+```yaml
+- name: Build backend Docker image
+  docker_image:
+    name: "{{ backend_image }}"
+    source: build
+    build:
+      path: /opt/yolo/backend
+```
 
-The solution was to update the application state using the returned product from the backend.
+This means Ansible no longer depends on a pre-built backend image from Docker Hub.
 
+The Docker image is generated during deployment.
 
-this.setState({
-    actualProductList: [...this.state.actualProductList, res.data],
-    formVisibleOnPage: false
-});
+### `docker_container`
 
+The `docker_container` module starts the backend container.
 
-After making this change a newly added products appeared instantly without refreshing the browser.
+It configures:
 
-## Backend Connectivity
+* Container name
+* Backend image
+* Port mapping
+* MongoDB connection string
+* Docker network
+* Restart policy
 
-At one stage the frontend could not communicate with the backend.
+The backend is connected to:
 
-This required checking that:
+```text
+ecommerce-net
+```
 
--the backend container was running,
--the backend was listening on port 5000,   
--Docker Compose networking was correctly configured,
--the MongoDB connection string pointed to the Docker service name instead of localhost.
+This allows it to communicate with MongoDB using the MongoDB container name.
 
+## Why This Role Runs Before the Frontend
 
-Once these were corrected, communication between all containers worked successfully.
+The frontend communicates with the backend API.
 
-# Git Workflow
+Therefore, the backend must be available before the frontend is deployed.
 
-Git was used throughout the project to track changes.
+This ordering also makes the architecture easier to understand:
 
-Descriptive commits were made after completing important stages 
+```text
+Frontend → Backend API → MongoDB
+```
 
-Using Git allowed changes to be tracked and previous versions to be restored if necessary.
+---
 
+# 7. Role 5 — frontend-deployment
 
-# Image Versioning
+## Purpose
 
-Semantic Versioning (SemVer) was used when tagging Docker images
-# Docker Hub
+The `frontend-deployment` role builds and starts the React frontend.
 
-The frontend and backend images were tagged and pushed to Docker Hub.
+The frontend source code is obtained by the `clone-repository` role and is located at:
 
-This allows anyone to clone the repository, pull the images and start the complete application using Docker Compose.
+```text
+/opt/yolo/client
+```
 
-Version tags were used instead of relying only on the latest tag.
+## Ansible Modules Used
 
+### `docker_image`
 
-This project demonstrated how Docker can simplify application deployment by separating each component into its own container while allowing them to work together through Docker Compose.
+The frontend Docker image is built from source:
 
-The final application successfully
+```yaml
+- name: Build frontend Docker image
+  docker_image:
+    name: "{{ frontend_image }}"
+    source: build
+    build:
+      path: /opt/yolo/client
+```
 
--runs the React frontend
--runs the Express backend
--connects to MongoDB
--persists product data using Docker volumes
--allows products to be added through the web interface
--survives container restarts without losing data
+This ensures that the frontend is also built automatically during deployment rather than pulled from Docker Hub.
 
+### `docker_container`
 
- the project achieved all the required objectives of containerizing a multi-service web application using Docker.
+The `docker_container` module starts the frontend container and configures its port and Docker network.
+
+The frontend is exposed on:
+
+```text
+3000
+```
+
+The container listens on port:
+
+```text
+80
+```
+
+Therefore the port mapping is:
+
+```text
+3000:80
+```
+
+---
+
+# 8. Why the Roles Are Ordered Sequentially
+
+The order of the roles is important because each stage prepares something required by the next stage.
+
+### Step 1 — Clone Repository
+
+The source code must exist before Docker images can be built.
+
+```text
+GitHub → /opt/yolo
+```
+
+### Step 2 — Docker Setup
+
+Docker must be installed before containers or images can be managed.
+
+```text
+Docker installation
+        ↓
+ecommerce-net
+```
+
+### Step 3 — MongoDB
+
+The database must be available before the backend is started.
+
+```text
+MongoDB
+```
+
+### Step 4 — Backend
+
+The backend requires MongoDB and provides the API used by the frontend.
+
+```text
+Backend API
+```
+
+### Step 5 — Frontend
+
+The frontend is deployed last because it communicates with the backend API.
+
+The resulting architecture is:
+
+```text
+┌──────────────────────┐
+│   React Frontend     │
+│      Port 3000       │
+└──────────┬───────────┘
+           │
+           ▼
+┌──────────────────────┐
+│ Node.js / Express    │
+│      Port 5000       │
+└──────────┬───────────┘
+           │
+           ▼
+┌──────────────────────┐
+│      MongoDB         │
+│      Port 27017      │
+└──────────────────────┘
+
+All containers communicate through:
+
+ecommerce-net
+```
+
+---
+
+# 9. Blocks
+
+The deployment roles use Ansible `block` structures to group related tasks.
+
+For example:
+
+```yaml
+- name: Backend deployment
+  block:
+
+    - name: Build backend Docker image
+      ...
+
+    - name: Run backend container
+      ...
+```
+
+The block groups all backend-related operations together.
+
+This improves readability and makes it easier to understand which tasks belong to a particular deployment operation.
+
+The same approach is used for the frontend and Docker setup roles.
+
+---
+
+# 10. Tags
+
+Tags are used to make individual sections of the playbook easier to execute selectively.
+
+For example:
+
+```yaml
+tags:
+  - backend
+  - deployment
+```
+
+This allows a specific part of the deployment to be targeted when necessary.
+
+For example:
+
+```bash
+ansible-playbook -i hosts playbook.yml --tags backend
+```
+
+The tags therefore provide flexibility during development and troubleshooting without requiring the entire playbook to be executed every time.
+
+---
+
+# 11. Variables
+
+Variables are used to avoid hard-coding configuration values throughout the roles.
+
+Examples include:
+
+```yaml
+backend_container_name: yolo-backend
+backend_image: hodhan/yolo-backend:v1.0.0
+backend_network: ecommerce-net
+backend_port: "5000:5000"
+mongodb_uri: mongodb://app-mongo:27017/yolomy
+```
+
+Frontend variables include:
+
+```yaml
+frontend_container_name: yolo-frontend
+frontend_image: hodhan/yolo-frontend:v1.0.5
+frontend_network: ecommerce-net
+frontend_port: "3000:80"
+```
+
+Repository variables define where the source code is obtained and stored.
+
+Using variables makes the deployment easier to maintain because configuration values can be changed without modifying the main task logic.
+
+---
+
+# 12. Docker Networking
+
+The application containers are connected to the same Docker network:
+
+```text
+ecommerce-net
+```
+
+This allows the containers to communicate with each other using Docker's internal networking and container names.
+
+For example, the backend connects to MongoDB using:
+
+```text
+mongodb://app-mongo:27017/yolomy
+```
+
+The backend does not need to connect to MongoDB using `localhost` because `localhost` inside the backend container refers to the backend container itself.
+
+The shared Docker network therefore allows:
+
+```text
+yolo-frontend
+      ↓
+yolo-backend
+      ↓
+app-mongo
+```
+
+---
+
+# 13. MongoDB Persistence
+
+MongoDB uses the named Docker volume:
+
+```text
+mongo-data
+```
+
+The volume is mounted to:
+
+```text
+/data/db
+```
+
+This is important because Docker containers themselves are replaceable.
+
+Without a persistent volume, deleting or recreating the MongoDB container could result in the loss of stored products.
+
+With the named volume, the database data remains available when the MongoDB container is restarted or recreated while the volume is preserved.
+
+This allows products added through the dashboard to persist.
+
+---
+
+# 14. Verification
+
+After running:
+
+```bash
+vagrant up --provision
+```
+
+the deployment should complete without Ansible failures.
+
+The containers can be verified with:
+
+```bash
+vagrant ssh
+sudo docker ps
+```
+
+The expected services are:
+
+```text
+app-mongo
+yolo-backend
+yolo-frontend
+```
+
+The backend API can be tested with:
+
+```bash
+curl http://localhost:5000/api/products
+```
+
+The frontend can be accessed through:
+
+```text
+http://localhost:3000
+```
+
+A product can then be added through the dashboard.
+
+The product should be stored in MongoDB and remain available after the MongoDB container is restarted because of the `mongo-data` persistent volume.
+
+---
+
+# 15. Conclusion
+
+The Stage 1 implementation demonstrates configuration management through Ansible and virtualization through Vagrant.
+
+The deployment is divided into separate roles so that each part of the infrastructure has a clear responsibility:
+
+```text
+clone-repository
+      ↓
+docker-setup
+      ↓
+setup-mongodb
+      ↓
+backend-deployment
+      ↓
+frontend-deployment
+```
+
+This structure makes the deployment repeatable and reduces the amount of manual configuration required.
+
+The combination of Ansible roles, variables, blocks, tags, Docker networking, source-based image builds, and persistent MongoDB storage provides a reproducible deployment process for the YOLO e-commerce application.
