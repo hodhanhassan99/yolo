@@ -1,199 +1,528 @@
-#  CAT 2 Project Explanation
+# Stage Two — Technical Project Explanation
 
-## 
-The objective of this project was to containerize an existing e-commerce application using Docker. The application consists of three separate components:
+## 1. Introduction
 
-1.A React frontend that users interact with.
-2.A Node.js/Express backend that processes requests.
-3.A MongoDB database that stores product information.
+Stage Two extends the deployment of the YOLO e-commerce application by moving the deployment environment to **AWS EC2**.
 
+Terraform is used for **Infrastructure as Code (IaC)**, while Ansible is used for **configuration management and application deployment**.
 
-Instead of installing each of these applications directly on my laptop Docker was used to package each one into its own container and Docker Compose was then used to make all three containers communicate with each other automatically.
+The objective is to automate the complete process rather than manually configuring the EC2 server.
 
-# the Project Structure
+The deployment therefore follows this general workflow:
 
-The project was already provided with three main components:
+```text
+Terraform
+    ↓
+AWS EC2
+    ↓
+Dynamic Ansible Inventory
+    ↓
+Ansible
+    ↓
+Clone Repository
+    ↓
+Configure Docker
+    ↓
+Deploy MongoDB
+    ↓
+Build Backend
+    ↓
+Build Frontend
+```
 
-1. **client/** – React frontend
-2. **backend/** – Node.js Express API
-  3.**MongoDB** – Database
+---
 
+# 2. Stage Two Playbook
 
-The goal was to create Docker containers that could run all three services together as one application
+The Stage Two playbook is:
 
-# Creating the Dockerfiles
+```yaml
+---
+- name: Deploy YOLO Application on AWS EC2
+  hosts: aws
+  become: true
 
-I created separate Dockerfiles  for the frontend (client) and backend.
+  roles:
+    - clone-repository
+    - docker-setup
+    - setup-mongodb
+    - backend-deployment
+    - frontend-deployment
+```
 
-## Frontend Dockerfile
+The order of these roles is intentional.
 
-The frontend uses a multistage build.
+### `clone-repository`
 
-During the first stage a Node.js image is used to install dependencies and build the React application.
+This must happen first because the application source code is required before Docker images can be built.
 
-A lightweight Alpine Linux image was selected because it contains only the packages required to build the application, making the final image much smaller.
+### `docker-setup`
 
-After the React application was built a second stage copies only the finished production files into an nginx container.
+Docker must be installed and configured before Docker containers or images can be created.
 
-Nginx is used because React production builds consist only of static HTML CSS and JavaScript files Nginx is lightweight fast and designed for serving static websites.
+### `setup-mongodb`
 
-This approach keeps the final frontend image much smaller than keeping Node.js inside the production container.
+MongoDB is started before the backend because the backend requires a database connection.
 
-## Backend Dockerfile
+### `backend-deployment`
 
-The backend Dockerfile uses the official Node.js Alpine image.
+The backend image is built from the cloned source code and the backend container is started.
 
+### `frontend-deployment`
 
-(FROM node:18-alpine)
+The frontend is deployed after the backend so that the complete application stack is available.
 
+---
 
-The backend requires Node.js to execute the Express server.
+# 3. Clone Repository Role
 
-The Dockerfile copies the application files  installs dependencies using npm and starts the server.
+The `clone-repository` role was added to ensure that the deployment builds the Docker images from the application's source code instead of depending on pre-built Docker Hub images.
 
+The role contains two tasks.
 
-# Creating docker-compose.yml
+## Installing Git
 
-Docker Compose was used to manage all application containers together.
+```yaml
+- name: Install Git
+  apt:
+    name: git
+    state: present
+    update_cache: yes
+```
 
-Three services were defined:
+The `apt` module is used to install Git on the Ubuntu EC2 instance.
 
- -frontend
+* `name: git` specifies the package.
+* `state: present` ensures Git is installed.
+* `update_cache: yes` updates the package cache before installation.
 
--backend
+## Cloning the repository
 
- -db
+```yaml
+- name: Clone YOLO repository
+  git:
+    repo: "{{ repo_url }}"
+    dest: "{{ repo_dest }}"
+    version: "{{ repo_version }}"
+```
 
-Instead of starting each container manually, Docker Compose starts everything using a single command.
+The `git` module clones the repository.
 
+The variables are stored in the role's `vars/main.yml`:
 
-(docker compose up)
+```yaml
+repo_url: "https://github.com/hodhanhassan99/yolo.git"
+repo_dest: "/opt/yolo"
+repo_version: "Stage_two"
+```
 
-# Docker Networking
+This means Ansible clones the repository into:
 
-A custom bridge network called **ecommerce-net** was created.
-This allows all containers to communicate securely with one another.
+```text
+/opt/yolo
+```
 
-Instead of connecting to MongoDB using localhost, the backend connects using the database service name.
+and checks out the Stage Two branch.
 
+This is important because the backend and frontend Dockerfiles are now available on the EC2 instance for the image-building tasks.
 
-(mongodb://db:27017/yolomy)
+---
 
+# 4. Docker Setup Role
 
-Docker automatically resolves **db** to the MongoDB container.
+The `docker-setup` role prepares the EC2 instance for container deployment.
 
-#  Port Allocation
+The role is responsible for installing Docker and creating the Docker network used by the application.
 
-Each service exposes only the ports needed by the user.
+The Docker network provides communication between the containers without requiring the containers to communicate through `localhost`.
 
-Frontend-  3000 -> 80
+The relevant Docker modules are used to manage the Docker environment.
 
+A custom network is used so that the backend can communicate with MongoDB through the Docker network.
 
-Backend- 5000 -> 5000
+---
 
+# 5. MongoDB Role
 
-MongoDB communicates only inside the Docker network and therefore does not need to expose a port to the host machine.
+The `setup-mongodb` role creates the MongoDB container.
 
+MongoDB is connected to the application's Docker network.
 
-# Step 6: Database Persistence
+A named Docker volume is used for persistence:
 
-One important requirement of the assignment was ensuring that products remain saved even after containers are stopped.
+```text
+mongo-data
+```
 
-A named Docker volume was created.
+The purpose of the volume is to prevent product information from being lost when the MongoDB container is restarted or recreated.
 
-volumes:
-  mongo-data:
+The role uses Docker-related Ansible modules such as `docker_container` and `docker_volume`.
 
+The MongoDB service therefore provides both:
 
-The MongoDB container stores its data inside this volume.
+* the database required by the backend;
+* persistent storage for application data.
 
-This means that even after running  docker compose down and later  docker compose up
-all previously added products remain in the database.
+---
 
-This confirmed that persistence was successfully implemented.
+# 6. Backend Deployment Role
 
-# Problems I Encountered
+The backend deployment role is responsible for building the backend image and starting the backend container.
 
-Several problems were encountered while completing this project.
+The role uses a block:
 
-##  React Build Failure
+```yaml
+- name: Backend deployment
+  block:
+```
 
-Initially the frontend image failed to build.
+Using a block groups the related backend tasks together and makes the playbook easier to organize.
 
-This error appeared: (ERR_OSSL_EVP_UNSUPPORTED)
+## Building the image
 
+```yaml
+- name: Build backend Docker image
+  docker_image:
+    name: "{{ backend_image }}"
+    source: build
+    build:
+      path: "{{ repo_dest }}/backend"
+```
 
-This happened because the project uses an older version of React Scripts together with a newer version of Node.js.The solution was to update the Dockerfile to use Node.js 18 instead of Node.js 20 which is compatible with the project's version of React Scripts.
+The `docker_image` module builds the Docker image.
 
-## Containers Exiting
+The important part is:
 
-At one point all containers stopped running after the application was closed.
+```yaml
+source: build
+```
 
-Running (docker ps -a) showed that the containers had exited. I restarted the application using (docker compose up) successfully and recreated the running containers.
-## Products Did Not Appear Immediately
+This tells Ansible to build the image instead of pulling a pre-built image.
 
-After adding a product through the form it was successfully saved in MongoDB but it did not immediately appear on the products page.
+The build context is:
 
-Initially the page had to be refreshed manually before the product became visible.
+```text
+/opt/yolo/backend
+```
 
-The issue was caused because the React state was not updated after the POST request completed.
+which comes from the cloned GitHub repository.
 
-The solution was to update the application state using the returned product from the backend.
+Therefore the deployment is now capable of building the backend image automatically on the EC2 instance.
 
+## Running the backend
 
-this.setState({
-    actualProductList: [...this.state.actualProductList, res.data],
-    formVisibleOnPage: false
-});
+```yaml
+- name: Run backend container
+  docker_container:
+    name: "{{ backend_container_name }}"
+    image: "{{ backend_image }}"
+    state: started
+    restart_policy: always
+```
 
+The `docker_container` module starts the backend container.
 
-After making this change a newly added products appeared instantly without refreshing the browser.
+`state: started` ensures that the container is running.
 
-## Backend Connectivity
+`restart_policy: always` allows Docker to automatically restart the container if it stops.
 
-At one stage the frontend could not communicate with the backend.
+The backend also receives the MongoDB connection string:
 
-This required checking that:
+```yaml
+env:
+  MONGODB_URI: "{{ mongodb_uri }}"
+```
 
--the backend container was running,
--the backend was listening on port 5000,   
--Docker Compose networking was correctly configured,
--the MongoDB connection string pointed to the Docker service name instead of localhost.
+This allows the backend application to connect to MongoDB.
 
+The backend is also connected to the configured Docker network.
 
-Once these were corrected, communication between all containers worked successfully.
+---
 
-# Git Workflow
+# 7. Frontend Deployment Role
 
-Git was used throughout the project to track changes.
+The frontend role follows a similar structure to the backend role.
 
-Descriptive commits were made after completing important stages 
+## Building the frontend image
 
-Using Git allowed changes to be tracked and previous versions to be restored if necessary.
+```yaml
+- name: Build frontend Docker image
+  docker_image:
+    name: "{{ frontend_image }}"
+    source: build
+    build:
+      path: "{{ repo_dest }}/client"
+```
 
+The `docker_image` module builds the React application from:
 
-# Image Versioning
+```text
+/opt/yolo/client
+```
 
-Semantic Versioning (SemVer) was used when tagging Docker images
-# Docker Hub
+Again, `source: build` is important because it means the image is created during deployment.
 
-The frontend and backend images were tagged and pushed to Docker Hub.
+The deployment therefore does not depend on a pre-built Docker Hub frontend image.
 
-This allows anyone to clone the repository, pull the images and start the complete application using Docker Compose.
+## Running the frontend
 
-Version tags were used instead of relying only on the latest tag.
+```yaml
+- name: Run frontend container
+  docker_container:
+    name: "{{ frontend_container_name }}"
+    image: "{{ frontend_image }}"
+    state: started
+    restart_policy: always
+```
 
+The `docker_container` module starts the frontend container.
 
-This project demonstrated how Docker can simplify application deployment by separating each component into its own container while allowing them to work together through Docker Compose.
+The container is connected to the configured Docker network and exposes the frontend port.
 
-The final application successfully
+---
 
--runs the React frontend
--runs the Express backend
--connects to MongoDB
--persists product data using Docker volumes
--allows products to be added through the web interface
--survives container restarts without losing data
+# 8. Ansible Blocks and Tags
 
+The deployment roles use Ansible blocks to group related operations.
 
- the project achieved all the required objectives of containerizing a multi-service web application using Docker.
+For example:
+
+```yaml
+- name: Backend deployment
+  block:
+    ...
+  tags:
+    - backend
+    - deployment
+```
+
+Tags allow individual sections of the deployment to be selected when running Ansible.
+
+For example:
+
+```bash
+ansible-playbook -i hosts playbook.yml --tags backend
+```
+
+can be used when only the backend deployment tasks need to be executed.
+
+Blocks improve organization by grouping related tasks under one logical operation.
+
+---
+
+# 9. Terraform Infrastructure
+
+Terraform is responsible for creating the AWS infrastructure required by the application.
+
+The main Terraform resources include:
+
+* AWS security group
+* AWS EC2 instance
+* local Ansible inventory file
+* Ansible provisioning trigger
+
+The EC2 instance is associated with the Terraform-created security group.
+
+---
+
+# 10. AWS Security Group
+
+The Terraform security group controls which network traffic can reach the EC2 instance.
+
+The configuration allows required application ports, including:
+
+```text
+22     SSH
+80     Frontend HTTP
+5000   Backend API
+27017  MongoDB
+3000   Application port where required
+```
+
+Port 22 allows SSH access for administration.
+
+Port 80 allows users to access the frontend through a web browser.
+
+Port 5000 allows access to the backend API.
+
+---
+
+# 11. Dynamic Ansible Inventory
+
+Terraform uses the `local_file` resource to generate the Ansible inventory.
+
+The inventory contains the public IP address of the EC2 instance:
+
+```text
+[aws]
+<EC2_PUBLIC_IP>
+
+[aws:vars]
+ansible_user=ubuntu
+```
+
+This is preferable to manually entering the IP address because an EC2 instance's public IP can change.
+
+Terraform automatically updates the inventory using the current EC2 public IP.
+
+This creates a connection between the infrastructure provisioning stage and the configuration-management stage.
+
+---
+
+# 12. Terraform and Ansible Integration
+
+Terraform also uses a `null_resource` with a `local-exec` provisioner to trigger Ansible.
+
+This allows the deployment to proceed from infrastructure creation into server configuration.
+
+The overall process becomes:
+
+```text
+terraform apply
+       ↓
+Create EC2
+       ↓
+Create Security Group
+       ↓
+Generate hosts file
+       ↓
+Run Ansible
+       ↓
+Clone GitHub repository
+       ↓
+Install/configure Docker
+       ↓
+Deploy MongoDB
+       ↓
+Build backend
+       ↓
+Build frontend
+```
+
+This is the main automation feature of Stage Two.
+
+---
+
+# 13. Docker Networking
+
+The application containers use a custom Docker bridge network.
+
+The network allows containers to communicate with each other using their Docker container/service names rather than relying on the EC2 host's localhost address.
+
+The main communication path is:
+
+```text
+Frontend
+    ↓
+Backend
+    ↓
+MongoDB
+```
+
+This separates the services while allowing them to operate together as one application.
+
+---
+
+# 14. MongoDB Persistence
+
+MongoDB uses a named Docker volume.
+
+The volume ensures that database information survives container recreation.
+
+For example, if the MongoDB container is removed and recreated while the named volume remains available, the stored product information is preserved.
+
+This satisfies the persistence requirement of the application.
+
+---
+
+# 15. Verification
+
+The deployment can be verified on the EC2 instance using:
+
+```bash
+sudo docker ps
+```
+
+The expected result is that the following containers are running:
+
+```text
+yolo-frontend
+yolo-backend
+app-mongo
+```
+
+The frontend can then be accessed using the EC2 instance's public IP.
+
+The backend can be checked through its configured API port.
+
+The MongoDB container should remain connected to the application Docker network and use the persistent volume.
+
+---
+
+# 16. Why Stage Two Improves on the Original Deployment
+
+The original approach depended on pre-built Docker images.
+
+Stage Two now improves the deployment process by cloning the source repository and building the images directly on the EC2 server.
+
+The deployment therefore follows:
+
+```text
+GitHub source code
+       ↓
+Clone repository
+       ↓
+Dockerfile
+       ↓
+Build image
+       ↓
+Run container
+```
+
+This makes the deployment more automated and reproducible.
+
+A new EC2 instance can be provisioned and configured without manually copying the application source code or manually building the Docker images.
+
+---
+
+# 17. Conclusion
+
+Stage Two demonstrates the integration of several DevOps technologies.
+
+**Terraform** provisions the AWS infrastructure.
+
+**Ansible** configures the EC2 server and deploys the application.
+
+**Git** provides the application source code.
+
+**Docker** packages and runs the application services.
+
+**MongoDB** provides persistent application storage.
+
+The final automated workflow is:
+
+```text
+Terraform
+    ↓
+AWS EC2
+    ↓
+Dynamic Inventory
+    ↓
+Ansible
+    ↓
+Clone Repository
+    ↓
+Docker Setup
+    ↓
+MongoDB + Persistent Volume
+    ↓
+Build Backend Image
+    ↓
+Run Backend
+    ↓
+Build Frontend Image
+    ↓
+Run Frontend
+```
+
+This demonstrates Infrastructure as Code, configuration management, containerization, service orchestration, application deployment, and persistent data storage within one automated deployment workflow.
