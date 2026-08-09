@@ -20,6 +20,5 @@ vault.yml
 .vscode/*.json
 **/.terraform/
 *.tfstate.backup
-*.tfstate
 .terraform.lock.hcl
 *.pem
